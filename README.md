@@ -1195,7 +1195,7 @@ python3 -m compileall -q crop_ssl && python3 -m pytest crop_ssl/tests/test_all.p
 
 ## 📜 License — All Rights Reserved
 
-Copyright © 2026 **Arghya Debnath**. **All rights reserved.**
+Copyright © 2026 **Arghya Bose (officialarghya29)**. **All rights reserved.**
 
 No permission to use, copy, modify, distribute, or build upon this code,
 models, data, or figures is granted to anyone, for any purpose, without the

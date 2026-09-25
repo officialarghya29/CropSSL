@@ -8,4 +8,4 @@ under domain shift conditions.
 """
 
 __version__ = "1.0.0"
-__author__ = "Arghya Debnath"
+__author__ = "Arghya Bose (officialarghya29)"
