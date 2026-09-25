@@ -224,7 +224,7 @@ def export_to_onnx_mobile(
         save_path,
         input_shape=input_shape,
         opset_version=opset_version,
-        dynamic_axes=None,  # static shapes: mobile runtimes pre-allocate
+        dynamic_axes={},  # truly static shapes; {} bypasses the None-default
         input_names=["input"],
         output_names=["logits"],
     )
