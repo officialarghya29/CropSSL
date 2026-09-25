@@ -122,6 +122,28 @@ Measured: SSL pre-trained (MoCo v3 / ViT-S) vs random-init — same architecture
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
 
+The same pipeline as a dependency graph:
+
+```mermaid
+flowchart LR
+    A["Unlabeled lab images\n(PlantVillage / synthetic)"] --> B["SSL pre-training
+DINOv2 · MoCo v3 · SimCLR · MAE"]
+    B --> C["Backbone with
+shift-robust features"]
+    C --> D{"Few-shot adaptation"}
+    D -- "0 labels" --> E["Naive deploy
+86.1% field"]
+    D -- "k labels/class" --> F["Linear · LoRA r=8 · Proto"]
+    F --> G["Field eval
+93–94% @ k=5"]
+    A -.->|"same classes,
+different camera"| H["FIELD domain"]
+    H --> G
+    C --> I["ONNX export
+→ fp32 / int8 mobile"]
+    G --> I
+```
+
 ---
 
 ## 📊 Benchmarks & Results (measured)
@@ -287,6 +309,44 @@ also appropriately confident), while the random backbone's confidence
 errors). A **9.4× difference** in expected calibration error from the same
 calibration procedure — pre-training buys calibrated confidence under
 shift, not just accuracy.
+
+#### The results, as measured (figures generated from the results JSON)
+
+<p align="center">
+  <img src="assets/figures/k_sweep_accuracy.png" alt="Measured few-shot field adaptation sweep" width="820">
+</p>
+
+<p align="center">
+  <img src="assets/figures/calibration_transfer.png" alt="Measured calibration transfer gap" width="640">
+</p>
+
+<p align="center">
+  <img src="assets/figures/parameter_efficiency.png" alt="Measured adapter parameter cost" width="700">
+</p>
+
+Every chart above is rendered directly from
+[`results/covariate_shift_measured.json`](results/covariate_shift_measured.json)
+by `crop_ssl/scripts/generate_readme_figures.py` — re-run that script after any
+experiment and the figures track the data. Nothing here is hand-drawn or mocked.
+
+#### How this evidence compares to the published literature
+
+| Evidence | Domain shift studied | Headline measured result |
+|----------|----------------------|--------------------------|
+| Mohanty, Hughes & Salathé, 2016 ([arXiv:1604.03169](https://arxiv.org/abs/1604.03169)) | lab photos → real field photos (PlantVillage CNN) | 99.35% lab → **31.4%** field — the canonical "accuracy cliff" |
+| **This repo** — controlled experiment, zero field labels | lab → simulated field (same 6 classes, camera perturbations) | **SSL 86.1%** vs random-init 53.0% — pre-training alone absorbs most of the cliff |
+| **This repo** — + 5 shots/class LoRA (r=8) | same | **93.1%** (field-oracle bound: 97.4%) |
+| **This repo** — calibration transfer | same | field ECE **4.1%** (SSL) vs 38.7% (random) — 9.4× confidence gap |
+
+> **Reading this honestly:** the Mohanty numbers and ours are *not* directly
+> comparable — different datasets, classifiers, and shift construction. What
+> the comparison shows is the *shape* of the problem: published field tests
+> collapse by tens of points, and this repo (i) reproduces that cliff in a
+> controlled, reproducible setting, (ii) quantifies which part of it SSL
+> removes **before any field labels exist**, and (iii) shows the remaining gap
+> closes with 5 labels per class. All repo numbers are one command away
+> (`covariate_shift_exp --k-sweep`); the literature numbers are from the
+> cited paper.
 
 > **Scope note:** this is a controlled synthetic experiment — it isolates the
 > *mechanism* (covariate shift + few-shot recovery) on CPU in minutes. Real-dataset
@@ -508,6 +568,43 @@ lab set it trains on, and why it ships three ways to attack the gap:
 | **Few-shot adaptation (LoRA)** | re-fits the representation with a handful of field labels | 5–50 labeled field images per class |
 | **Domain alignment (MMD/CORAL/DANN)** | explicitly minimizes feature divergence | source + unlabeled target both available |
 
+### Why Self-Supervised Features Shrink the Bound: the Geometry View
+
+The Ben-David bound above says the target risk is governed by the **domain
+divergence** term. SSL attacks it without a single label: a contrastive
+objective (MoCo v3/SimCLR) pulls two augmentations of the same leaf together
+and pushes different leaves apart, so the representation becomes invariant to
+exactly the factors the field varies — white balance, gamma, sensor noise,
+background clutter. Geometrically, class manifolds that were entangled in
+RGB pixel space become **linearly separable** in the embedding space.
+
+This repo's measured sweep makes the geometry visible:
+
+- **Random init, k=1**: a *parametric* linear probe on random features gets
+  71.5% — the head has 38 × 384 weights to fit from 6 labeled images, so it
+  underfits and lags the label-free SSL features (73.4% linear at k=1 comes
+  only at k≥2 for random).
+- **SSL, k=0 (naive)**: 86.1% **with no field labels at all** — the head was
+  trained on LAB only, yet the features were already close enough to
+  field-invariant that the lab decision boundary mostly transfers.
+- By k=5 both backbones' probes converge (~94–96%) — with enough labels,
+  the *head* learns to compensate for worse features. The pre-training
+  advantage is largest exactly where labels are scarcest, which is the
+  regime that matters in a farmer's field.
+
+### Prototypical Networks: Why Zero-Parameter Adaptation Works
+
+The prototypical adapter computes one embedding mean per class from the
+support set, c_k = (1/|S_k|) Σ_{z∈S_k} z, and classifies by nearest prototype
+(softmax over −d(z, c_k)/τ). With **zero trainable parameters** it cannot
+overfit — and the measured table shows the consequence: at **k=1** it is the
+*best* few-shot method for both backbones (74.1% SSL / 73.7% random, beating
+LoRA's 66.4% / 62.2%), because LoRA must gradient-update 235K parameters from
+6 examples. From k≥2 the parametric adapters overtake it. This is the classic
+few-shot trade-off, now measured in this repo: **non-parametric heads win the
+catastrophically-low-label regime; parametric heads win once a handful of
+labels per class exist.**
+
 ### CKA: Measuring the Gap Itself
 
 How do you *quantify* how far apart two domains are in feature space, instead
@@ -677,6 +774,10 @@ Measured on ViT-S/16 (38-class head), this machine:
 The int8 graph is checked structurally (`quantized_ops=True`) so "quantized"
 never silently means a renamed fp32 model. Place the `.int8.onnx` in Android
 assets and run it with ONNX Runtime Mobile's integer backend.
+
+<p align="center">
+  <img src="assets/figures/mobile_int8.png" alt="Measured int8 quantization footprint" width="560">
+</p>
 
 ### Python API
 
@@ -1079,7 +1180,7 @@ Every push to `main` runs three automated checks via GitHub Actions
 
 | Job | What runs |
 |-----|-----------|
-| **checks** | `compileall` syntax gate + import smoke-test of all 51 modules + secret scan |
+| **checks** | `compileall` syntax gate + import smoke-test of all 52 modules + secret scan |
 | **test** | The full **228-test** suite (`pytest crop_ssl/tests/test_all.py`) |
 | **docker** | Verifies the Docker image builds (on `main`) |
 
@@ -1092,9 +1193,16 @@ python3 -m compileall -q crop_ssl && python3 -m pytest crop_ssl/tests/test_all.p
 
 ---
 
-## 📜 License
+## 📜 License — All Rights Reserved
 
-MIT License — See [LICENSE](LICENSE) for details.
+Copyright © 2026 **Arghya Debnath**. **All rights reserved.**
+
+No permission to use, copy, modify, distribute, or build upon this code,
+models, data, or figures is granted to anyone, for any purpose, without the
+author's prior explicit **written** consent. Viewing this repository and
+citing it for academic reference is allowed; anything more requires written
+permission (contact: officialarghya29@gmail.com). See
+[LICENSE](LICENSE) for the full terms.
 
 ---
 

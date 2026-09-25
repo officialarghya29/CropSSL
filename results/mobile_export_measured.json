@@ -1,0 +1,21 @@
+{
+  "meta": {
+    "experiment": "mobile_int8_export",
+    "model": "vit_small_patch16(num_classes=38)",
+    "input_shape": [
+      1,
+      3,
+      224,
+      224
+    ],
+    "opset": 14,
+    "environment": "CPU",
+    "date": "2026-09-25"
+  },
+  "fp32_size_kb": 84594.0,
+  "int8_size_kb": 21668.2,
+  "compression_ratio": 3.9,
+  "verified": true,
+  "max_diff": 7.9e-07,
+  "quantized_ops": true
+}

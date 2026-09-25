@@ -1,21 +1,38 @@
-MIT License
+Copyright (c) 2026 Arghya Debnath. All Rights Reserved.
 
-Copyright (c) 2026 Arghya Debnath
+Ownership notice
+================
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+This software, its source code, model architectures, training pipelines,
+experimental data, figures, and accompanying documentation (collectively, the
+"Work") are the exclusive property of Arghya Debnath ("the Author").
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+1. No license is granted.
+   All rights are reserved by the Author. No one may use, copy, reproduce,
+   distribute, publish, modify, adapt, translate, create derivative works
+   from, sublicense, sell, or exploit the Work — or any portion of it — in
+   any form or medium, for any purpose (commercial or non-commercial),
+   without the Author's prior explicit written permission.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+2. Viewing and reference only.
+   You may view this repository and cite the Work with attribution
+   ("Arghya Debnath, CropSSL, https://github.com/officialarghya29/CropSSL")
+   for academic and educational reference purposes only. Such citation does
+   not imply any license to use, run, or build upon the Work.
+
+3. No warranty.
+   THE WORK IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+   THE AUTHOR BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY ARISING
+   FROM OR RELATED TO THE WORK.
+
+4. Exceptions.
+   Only a written, signed grant signed by the Author can authorize any use
+   beyond the viewing-and-reference terms above. Any automated, agent-based,
+   or AI-assisted ingestion or use of this Work likewise requires such
+   prior written permission.
+
+Contact: officialarghya29@gmail.com
+
+© 2026 Arghya Debnath. All Rights Reserved.
