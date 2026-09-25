@@ -3435,6 +3435,89 @@ def test_export_ssl_backbone():
         os.unlink(path)
 
 
+def test_mobile_export_fp32_static_shape():
+    """Mobile export: fp32 path with fixed shape verifies against PyTorch."""
+    import tempfile, os
+    import torch.nn as nn
+    from crop_ssl.utils.export import export_to_onnx_mobile
+
+    tiny = nn.Sequential(
+        nn.Conv2d(3, 8, 3, padding=1), nn.ReLU(),
+        nn.AdaptiveAvgPool2d(1), nn.Flatten(), nn.Linear(8, 5),
+    ).eval()
+    with tempfile.TemporaryDirectory() as tmpdir:
+        path = os.path.join(tmpdir, "mobile.onnx")
+        result = export_to_onnx_mobile(
+            tiny, path, input_shape=(1, 3, 64, 64), quantize=False, verify=True
+        )
+        assert os.path.exists(result["fp32_path"]), "fp32 mobile model missing"
+        assert result["int8_path"] is None, "quantize=False must not emit int8"
+        assert result["fp32_size_kb"] > 0
+        assert result["verified"] is True, f"fp32 verification failed: {result}"
+        assert result["max_diff"] < 1e-4
+    print("    Mobile fp32 export: static shape verified vs PyTorch ✓")
+
+
+def test_mobile_export_int8_quantized():
+    """Mobile export: int8 copy is smaller AND a genuine integer (QDQ) graph."""
+    import tempfile, os
+    import torch.nn as nn
+    from crop_ssl.utils.export import export_to_onnx_mobile
+
+    tiny = nn.Sequential(
+        nn.Conv2d(3, 16, 3, padding=1), nn.ReLU(),
+        nn.Conv2d(16, 8, 3, padding=1), nn.ReLU(),
+        nn.AdaptiveAvgPool2d(1), nn.Flatten(), nn.Linear(8, 5),
+    ).eval()
+    with tempfile.TemporaryDirectory() as tmpdir:
+        path = os.path.join(tmpdir, "mobile_int8.onnx")
+        result = export_to_onnx_mobile(
+            tiny, path, input_shape=(1, 3, 64, 64), quantize=True, verify=True
+        )
+        assert result["int8_path"] is not None, "int8 model not produced"
+        assert os.path.exists(result["int8_path"])
+        assert result["int8_size_kb"] < result["fp32_size_kb"], (
+            f"int8 ({result['int8_size_kb']} KB) should be smaller than "
+            f"fp32 ({result['fp32_size_kb']} KB)"
+        )
+        assert result["quantized_ops"] is True, (
+            "int8 graph lacks QuantizeLinear/QLinearConv ops — not a real "
+            "integer graph"
+        )
+        # the int8 model must actually run and produce finite logits
+        import numpy as np
+        import onnxruntime as ort
+        sess = ort.InferenceSession(result["int8_path"])
+        x = np.random.randn(1, 3, 64, 64).astype(np.float32)
+        out = sess.run(None, {"input": x})[0]
+        assert out.shape == (1, 5) and np.isfinite(out).all()
+    print(
+        f"    Mobile int8: {result['int8_size_kb']} KB vs fp32 "
+        f"{result['fp32_size_kb']} KB, QDQ ops present ✓"
+    )
+
+
+def test_mobile_export_input_validation():
+    """Mobile export rejects dynamic batch shapes and pre-14 opsets."""
+    import torch.nn as nn
+    from crop_ssl.utils.export import export_to_onnx_mobile
+
+    tiny = nn.Sequential(nn.Conv2d(3, 4, 3, padding=1), nn.ReLU()).eval()
+    for bad_shape, bad_opset in [((2, 3, 64, 64), 14), ((1, 3, 64, 64), 13)]:
+        try:
+            export_to_onnx_mobile(
+                tiny, "/tmp/should_not_exist.onnx",
+                input_shape=bad_shape, opset_version=bad_opset,
+                quantize=False, verify=False,
+            )
+            raise AssertionError(
+                f"expected ValueError for shape={bad_shape}, opset={bad_opset}"
+            )
+        except ValueError:
+            pass
+    print("    Mobile export validation: batch/opset guards ✓")
+
+
 def test_all_datasets_have_num_classes():
     """All datasets should expose num_classes property."""
     import tempfile
@@ -3944,6 +4027,9 @@ if __name__ == "__main__":
     run_test("CKA domain-gap diagnosis", test_cka_domain_gap_diagnosis)
     run_test("ViT attention shapes", test_vit_attention_map_shapes)
     run_test("Config roundtrip detailed", test_config_from_dict_roundtrip)
+    run_test("Mobile export fp32 static-shape", test_mobile_export_fp32_static_shape)
+    run_test("Mobile export int8 quantized", test_mobile_export_int8_quantized)
+    run_test("Mobile export input validation", test_mobile_export_input_validation)
     run_test("Export SSL backbone", test_export_ssl_backbone)
     run_test("CrossDomain new datasets", test_cross_domain_dataset_with_new_datasets)
     run_test("Download script --list", test_download_data_list)

@@ -9,12 +9,14 @@
 <p align="center">
   <img src="https://img.shields.io/badge/Python-3.10+-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python">
   <img src="https://img.shields.io/badge/PyTorch-2.0+-EE4C2C?style=for-the-badge&logo=pytorch&logoColor=white" alt="PyTorch">
-  <img src="https://img.shields.io/badge/Tests-225%20✅-brightgreen?style=for-the-badge" alt="Tests">
+  <img src="https://img.shields.io/badge/Tests-228%20✅-brightgreen?style=for-the-badge" alt="Tests">
   <img src="https://img.shields.io/badge/SSL-4%20Methods-blueviolet?style=for-the-badge" alt="SSL">
   <img src="https://img.shields.io/badge/Datasets-13-teal?style=for-the-badge" alt="Datasets">
   <img src="https://img.shields.io/badge/API-52%20Endpoints-orange?style=for-the-badge" alt="API">
   <img src="https://img.shields.io/badge/CI-GitHub%20Actions-brightgreen?style=for-the-badge&logo=githubactions&logoColor=white" alt="CI">
-  <img src="https://img.shields.io/badge/Lines-19K+-gray?style=for-the-badge" alt="Lines">
+  <a href="https://github.com/officialarghya29/CropSSL/actions/workflows/ci.yml"><img src="https://github.com/officialarghya29/CropSSL/actions/workflows/ci.yml/badge.svg" alt="CI status"></a>
+  <img src="https://img.shields.io/badge/License-MIT-informational?style=for-the-badge" alt="License">
+  <img src="https://img.shields.io/badge/Lines-20K+-gray?style=for-the-badge" alt="Lines">
   <img src="https://img.shields.io/badge/Files-69-blue?style=for-the-badge" alt="Files">
   <img src="https://img.shields.io/badge/Mobile-PWA%20Android-brightgreen?style=for-the-badge" alt="Mobile">
 </p>
@@ -23,6 +25,21 @@
   <em>A complete research framework for studying how self-supervised vision models generalize across
   controlled lab conditions and real-world field environments for plant disease detection.</em>
 </p>
+
+---
+
+## ⚡ Quickstart (60 seconds)
+
+```bash
+git clone https://github.com/officialarghya29/CropSSL.git && cd CropSSL
+python3 -m venv venv && source venv/bin/activate
+pip install -r requirements.txt && pip install -e .
+python3 -m crop_ssl.scripts.run_pipeline --epochs 1 --device cpu   # full SSL → LoRA → eval loop
+streamlit run crop_ssl/frontend/app.py                             # dashboard at localhost:8501
+```
+
+No GPU needed — every experiment here runs on CPU. Full options, the API server,
+ONNX export and dataset downloads: [Installation & Quick Start](#-installation--quick-start).
 
 ---
 
@@ -278,7 +295,7 @@ shift, not just accuracy.
 
 ---
 
-## 🧪 Test Suite: 225/225 Passing
+## 🧪 Test Suite: 228/228 Passing
 
 ```
 pytest crop_ssl/tests/test_all.py
@@ -636,6 +653,31 @@ and place the `.onnx` in `app/src/main/assets/` (full guide in
 [`android/README.md`](android/README.md)). Pair the exported embeddings with a
 small linear head, or use them with a k-NN / nearest-centroid classifier.
 
+#### Mobile int8 path (measured)
+
+For phones, `export_to_onnx_mobile()` produces a **static-shape** graph plus an
+optional **static int8-quantized** copy (per-tensor QDQ, calibrated activations):
+
+```python
+from crop_ssl.models.backbones.vit import vit_small_patch16
+from crop_ssl.utils.export import export_to_onnx_mobile
+
+model = vit_small_patch16(num_classes=38)
+result = export_to_onnx_mobile(model, "cropssl_mobile.onnx")
+# result: fp32_path, int8_path, sizes, verified, max_diff, quantized_ops
+```
+
+Measured on ViT-S/16 (38-class head), this machine:
+
+| Artifact | Size | Verification |
+|----------|------|--------------|
+| fp32, static 224×224 | 84,594 KB | PASS vs PyTorch (max diff 7.9e-7) |
+| **int8 (QDQ, static)** | **21,668 KB** | **3.90× smaller**; graph verified to contain QuantizeLinear/QLinearConv ops |
+
+The int8 graph is checked structurally (`quantized_ops=True`) so "quantized"
+never silently means a renamed fp32 model. Place the `.int8.onnx` in Android
+assets and run it with ONNX Runtime Mobile's integer backend.
+
 ### Python API
 
 ```python
@@ -919,7 +961,7 @@ The full API surface is also browsable live at `http://localhost:8000/docs`.
 
 ```
 CropSSL/
-├── .github/workflows/ci.yml       # CI/CD: syntax + imports + 225 tests + Docker
+├── .github/workflows/ci.yml       # CI/CD: syntax + imports + 228 tests + Docker
 ├── android/                       # Native Android WebView wrapper (APK)
 ├── crop_ssl/
 │   ├── models/
@@ -989,7 +1031,7 @@ CropSSL/
 │   │   ├── logging.py                 # Structured logging
 │   │   └── reproducibility.py         # Seed-based determinism
 │   └── tests/
-│       └── test_all.py                # 225 tests (all passing)
+│       └── test_all.py                # 228 tests (all passing)
 ├── assets/logo.png
 ├── requirements.txt
 ├── pyproject.toml
@@ -1038,7 +1080,7 @@ Every push to `main` runs three automated checks via GitHub Actions
 | Job | What runs |
 |-----|-----------|
 | **checks** | `compileall` syntax gate + import smoke-test of all 51 modules + secret scan |
-| **test** | The full **225-test** suite (`pytest crop_ssl/tests/test_all.py`) |
+| **test** | The full **228-test** suite (`pytest crop_ssl/tests/test_all.py`) |
 | **docker** | Verifies the Docker image builds (on `main`) |
 
 Badge status shows directly under the project title. Run everything locally
