@@ -2240,6 +2240,49 @@ def test_api_endpoints():
     print(f"    API endpoints ({len(routes)} routes): OK")
 
 
+def test_documented_counts_match_app():
+    """README claims must equal the live app, so docs can never drift again.
+
+    Locks three figures the README states as facts:
+      - N API endpoints (deterministic APIRoute count)
+      - N datasets (DATASET_REGISTRY / GET /datasets)
+    """
+    import re
+    from pathlib import Path
+    from fastapi.routing import APIRoute
+    from crop_ssl.backend.api import app
+    from crop_ssl.data.datasets import DATASET_REGISTRY
+
+    readme = Path(__file__).resolve().parent.parent.parent / "README.md"
+    text = readme.read_text(encoding="utf-8")
+
+    api_count = sum(1 for r in app.routes if isinstance(r, APIRoute))
+    m = re.search(r"API-(\d+)%20Endpoints", text)
+    assert m, "README API endpoints badge not found"
+    assert int(m.group(1)) == api_count, (
+        f"README badge says {m.group(1)} API endpoints, app has {api_count}"
+    )
+
+    m = re.search(r"Backend API \((\d+) Routes\)", text)
+    assert m, "README 'Backend API (N Routes)' heading not found"
+    assert int(m.group(1)) == api_count, (
+        f"README heading says {m.group(1)} routes, app has {api_count}"
+    )
+
+    ds_count = len(DATASET_REGISTRY)
+    m = re.search(r"Datasets-(\d+)", text)
+    assert m, "README datasets badge not found"
+    assert int(m.group(1)) == ds_count, (
+        f"README badge says {m.group(1)} datasets, registry has {ds_count}"
+    )
+
+    rows = len(re.findall(r"^\| \d+ \| \*\*", text, flags=re.MULTILINE))
+    assert rows == ds_count, (
+        f"README dataset table has {rows} rows, registry has {ds_count}"
+    )
+    print(f"    README counts locked: {api_count} endpoints, {ds_count} datasets ✓")
+
+
 def test_full_pipeline_mini():
     """Mini end-to-end pipeline: create data → train → eval → report."""
     import time
@@ -3920,6 +3963,7 @@ if __name__ == "__main__":
     run_test("Training loop one epoch", test_training_loop_one_epoch)
     run_test("MAE loss decreasing", test_ssl_loss_decreasing)
     run_test("API endpoints registered", test_api_endpoints)
+    run_test("README counts match app", test_documented_counts_match_app)
     run_test("Full pipeline mini", test_full_pipeline_mini)
     run_test("EMA state divergence", test_model_ema_state_dict)
     run_test("DINOv2 multi-crop configs", test_multi_crop_dinov2)
